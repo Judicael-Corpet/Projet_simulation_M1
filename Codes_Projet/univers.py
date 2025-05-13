@@ -39,7 +39,7 @@ class Univers(object):
         
         
     def simulateAll(self):
-        #On calcule le mouvement pur un pas pour chaque agent
+        #On calcule le mouvement pour un pas pour chaque agent
         for p in self.population:
             for source in self.generators :
                 source.setForce(p)
@@ -48,7 +48,7 @@ class Univers(object):
         self.time.append(self.time[-1]+self.step)
 
     def simulateFor(self,duration):
-        # On calcule autant de pas que nécessaire pendant duration
+        # On calcule autant de pas que nécessaire pendant une durée limitée (duration)
         while duration > 0:
             self.simulateAll()
             duration -= self.step
