@@ -1,0 +1,125 @@
+import matplotlib.pyplot as plt
+from Moteur_CC import *
+import pandas as pd
+
+
+
+# === Fonction de simulation ===
+def simulate(Kp, Ki, duration=2.0, step=0.01):
+    moteur = MoteurCC()
+    controller = ControlPI_vitesse(moteur, Kp, Ki)
+
+    t = 0.0
+    time = []
+
+    while t < duration:
+        controller.setTarget(1.0)  # consigne de vitesse = 1 rad/s
+        controller.simule(step)
+        t += step
+        time.append(t)
+
+    return time, controller.speeds, controller.voltages
+
+#Fonction d'analyse
+def analyse_performance(Kp, Ki, duration=2.0, step=0.01, consigne=1.0):
+    t, speeds, voltages = simulate(Kp, Ki, duration, step)
+
+    vitesse_finale = speeds[-1]
+    erreur_statique = abs(consigne - vitesse_finale)
+    tension_max = max([abs(v) for v in voltages])
+    vitesse_max = max(speeds)
+
+    # Temps de réponse = temps pour atteindre 95% de la consigne
+    seuil = 0.95 * consigne
+    temps_reponse = None
+    for i in range(len(speeds)):
+        if speeds[i] >= seuil:
+            temps_reponse = t[i]
+            break
+    if temps_reponse is None:
+        temps_reponse = duration  # jamais atteint
+
+    return {
+        "Kp": Kp,
+        "Ki": Ki,
+        "Temps de réponse (s)": round(temps_reponse, 3),
+        "Erreur statique": round(erreur_statique, 4),
+        "Tension max (V)": round(tension_max, 2),
+        "Vitesse max (rad/s)": round(vitesse_max, 4)
+    }
+
+#Fonction d'affichage des résultats dans un tableau
+def afficher_tableau_performances(gain_list):
+    performances = []
+    for Kp, Ki in gain_list:
+        result = analyse_performance(Kp, Ki)
+        performances.append(result)
+
+    df = pd.DataFrame(performances)
+
+    # Création de la figure
+    fig, ax = plt.subplots(figsize=(10, len(df) * 0.6 + 1))
+    ax.axis('off')  # pas d'axes
+
+    # Affichage du tableau avec bordures
+    table = ax.table(cellText=df.values,
+                     colLabels=df.columns,
+                     loc='center',
+                     cellLoc='center',
+                     colLoc='center',
+                     edges='open')  # permet d’afficher proprement
+
+    # Mise en forme
+    table.scale(1.2, 1.4)  # taille du texte
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+
+    # Lignes et colonnes séparées visuellement
+    for key, cell in table.get_celld().items():
+        cell.set_linewidth(1)
+        cell.set_edgecolor('black')
+
+    plt.title("Comparaison des performances pour différents gains PI", fontsize=14)
+    plt.tight_layout()
+    plt.show()
+
+
+
+# === Étude de l'influence des gains ===
+gain_list = [
+    (2.0, 0.0),   # P seul (faible)
+    (5.0, 0.0),   # P seul (fort)
+    (2.0, 2.0),   # PI modéré
+    (5.0, 10.0),  # PI agressif
+    (10.0, 10.0),  # PI agressif
+    (5.0, 20.0),  # PI agressif
+]
+
+afficher_tableau_performances(gain_list)
+
+# Tracé des vitesses
+plt.figure(figsize=(10, 5))
+for Kp, Ki in gain_list:
+    t, speeds, _ = simulate(Kp, Ki)
+    plt.plot(t, speeds, label=f"Kp={Kp}, Ki={Ki}")
+
+plt.axhline(1.0, color='gray', linestyle='--', label='Consigne 1 rad/s')
+plt.xlabel("Temps (s)")
+plt.ylabel("Vitesse (rad/s)")
+plt.title("Comparaison des vitesses pour différents gains P/I")
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# Tracé des tensions
+plt.figure(figsize=(10, 5))
+for Kp, Ki in gain_list:
+    t, _, voltages = simulate(Kp, Ki)
+    plt.plot(t, voltages, label=f"Kp={Kp}, Ki={Ki}")
+
+plt.xlabel("Temps (s)")
+plt.ylabel("Tension de commande (V)")
+plt.title("Tension générée par le contrôleur PI")
+plt.grid(True)
+plt.legend()
+plt.show()

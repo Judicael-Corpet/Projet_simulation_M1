@@ -4,6 +4,7 @@ from random import random,randint
 import pygame
 from pygame.locals import *
 from types import MethodType
+from math import *
 
 
 # Création de l'environnement de simulation

@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 18 12:06:23 2025
-
-@author: haliyo
-"""
-
 class SolideRigide():
     from vector3D import Vector3D as V3D
     from torseur import Torseur as T

@@ -1,9 +1,12 @@
 from random import random,randint
 from vector3D import Vector3D as V3D
 from particule import Particule
+from Moteur_CC import MoteurCC, ControlPI_vitesse
 import pygame
 from pygame.locals import *
 from types import MethodType
+import matplotlib.pyplot as plt
+
 
 class Univers(object):
     def __init__(self,name='ici',t0=0,step=0.1,dimensions=(100,100),game=False,gameDimensions=(1024,780),fps=60):
@@ -142,6 +145,18 @@ class Force(object):
         if self.active:
             particule.applyForce(self.force)
 
+
+class ForceSelect(Force):
+    
+    def __init__(self,force=V3D(),subject=None,name='force',active=True):
+        self.force = force
+        self.name = name
+        self.active = active
+        self.subjects=subject
+
+    def setForce(self,particule):
+        if self.active and particule in self.subjects:
+            particule.applyForce(self.force)
 class Gravity(Force):
     def __init__(self,g=V3D(0,-9.8),name='gravity',active=True):
         self.g = g
@@ -197,12 +212,53 @@ class SpringDamper(Force):
             particule.applyForce(-force)
         else:
             pass
-        
+
+
+class ForceCentrifuge(Force):
+    def __init__(self, moteur, centre, name="centrifuge", active=True):
+        self.moteur = moteur
+        self.centre = centre
+        self.name = name
+        self.active = active
+
+    def setForce(self, particule):
+        if self.active:
+            vec = particule.getPosition() - self.centre.getPosition()
+            r = vec.mod()
+            if r > 0:
+                omega = self.moteur.getSpeed()
+                force = particule.mass * omega**2 * vec.norm()
+                particule.applyForce(force)
+
+
 class Link(SpringDamper):
     def __init__(self,P0,P1,name="link"):
         l0 = (P0.getPosition()-P1.getPosition()).mod()
         SpringDamper.__init__(self,P0, P1,1000,100,l0,True,"link")
 
+
+class Prism(SpringDamper):
+    def __init__(self,P0,P1,axis=V3D(),name="prism"):
+        l0 = (P0.getPosition()-P1.getPosition()).mod()
+        SpringDamper.__init__(self,P0, P1,1000,100,l0,True,name)
+        self.axis=axis.norm()
+
+    def setForce(self, particule):
+        vec_dir = self.P1.getPosition() - self.P0.getPosition()
+        vec_dir -= vec_dir ** self.axis * self.axis
+        v_n = vec_dir.norm()
+        flex = vec_dir.mod()-self.l0
+        
+        vit = self.P1.getSpeed() - self.P0.getSpeed()
+        vit_n = vit ** v_n * self.c 
+        
+        force = (self.k * flex + vit_n)* v_n
+        if particule == self.P0:
+            particule.applyForce(force)
+        elif particule == self.P1:
+            particule.applyForce(-force)
+        else:
+            pass
 
 if __name__=='__main__':
     from pylab import figure, show, legend
@@ -215,7 +271,8 @@ if __name__=='__main__':
     
     P_fixe = Particule(p0=V3D(monUnivers.dimensions[0]/2,monUnivers.dimensions[1]/2),fix=True)
     P_osc = Particule(p0=V3D(monUnivers.dimensions[0]/2,monUnivers.dimensions[1]/2 - 10))
-    
+    moteur = MoteurCC(R=1.0, L=0.001, kc=0.01, ke=0.01, J=0.01, f=0.1)
+
     
     force = Gravity(V3D(0,-10))
     boing = Bounce_y(.9,monUnivers.step) 
@@ -223,10 +280,49 @@ if __name__=='__main__':
     
     ressort = SpringDamper(P_fixe,P_osc,k=10,l0=10, c=1)
     
-    
     monUnivers.addParticule(P0,P_fixe,P_osc)
-    monUnivers.addGenerators(force,boing,boing2,ressort)
-    
+    monUnivers.addGenerators(force,boing,boing2,ressort,)
+
+    def simulate_centrifugeuse(k_ressort=2.0, tensions_BO=range(1, 21), step=0.01, duration=2.0):
+        distances = []
+        vitesses = []
+
+        for U in tensions_BO:
+            # Création de l’univers
+            univers = Univers(name=f"centrifuge_U{U}", step=step)
+            
+            # Centre fixe (origine)
+            P_fixe = Particule(p0=V3D(50, 50), fix=True)
+
+            # Particule mobile initialement proche du centre
+            P_mobile = Particule(p0=V3D(50, 55), v0=V3D(0, 0), mass=1)
+
+            # Ressort entre les deux
+            ressort = SpringDamper(P_fixe, P_mobile, k=k_ressort, c=0.5, l0=5)
+
+            # Moteur CC en BO
+            moteur = MoteurCC(R=1.0, L=0.001, kc=0.01, ke=0.01, J=0.01, f=0.1)
+            moteur.setVoltage(U)
+
+            # Force centrifuge générée par le moteur
+            force_centrifuge = ForceCentrifuge(moteur, centre=P_fixe)
+
+            # Ajout à l’univers
+            univers.addParticule(P_fixe, P_mobile)
+            univers.addGenerators(ressort, force_centrifuge)
+
+            # Simulation pendant la durée indiquée
+            for _ in range(int(duration / step)):
+                moteur.simule(step)
+                univers.simulateAll()
+
+            # Mesure distance et vitesse
+            d = (P_mobile.getPosition() - P_fixe.getPosition()).mod()
+            distances.append(d)
+            vitesses.append(moteur.getSpeed())
+
+        return vitesses, distances
+
     def myInteraction(self,events,keys):
         # controle de leader avec le clavier
         if keys[ord('z')] or keys[pygame.K_UP]: # And if the key is z or K_DOWN:
@@ -252,8 +348,19 @@ if __name__=='__main__':
                 part = Particule(p0=pos,v0=vit,name=name,color=color,mass=1)
                 monUnivers.addParticule(part)
 
-         
-# Surcharge de la fonction ici
+    omegas, distances = simulate_centrifugeuse()
+
+    # === Tracé distance en fonction de Ω ===
+    plt.figure()
+    plt.plot(omegas, distances, 'o-', color='blue')
+    plt.xlabel("Vitesse de rotation Ω (rad/s)")
+    plt.ylabel("Distance d (m)")
+    plt.title("Distance d en fonction de la vitesse Ω en régime permanent")
+    plt.grid(True)
+    plt.show()    
+
+
+    # Surcharge de la fonction ici
     monUnivers.gameInteraction = MethodType(myInteraction,monUnivers)
     
     monUnivers.simulateRealTime()
