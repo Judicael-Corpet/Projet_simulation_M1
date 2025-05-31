@@ -78,6 +78,9 @@ class Vector3D():
         self.x = x
         self.y = y
         return self
+    
+    def __truediv__(self, scalar):
+        return Vector3D(self.x / scalar, self.y / scalar, self.z / scalar)
  
     def save(self,nom='vec.dat'):
         from pickle import dump

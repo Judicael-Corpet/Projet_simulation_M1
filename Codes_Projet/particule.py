@@ -28,15 +28,19 @@ class Particule(object):
         self.pfd(step)
         
     def pfd(self, step):
-        
+        if not self.speed:
+            self.speed = [V3D(0, 0, 0)]
+        if not self.acceleration:
+            self.acceleration = [V3D(0, 0, 0)]
+
         if not(self.fix):
-            a = self.forces * (1/self.mass)
-            v = self.speed[-1]+a*step
-        else :
+            a = self.forces * (1 / self.mass)
+            v = self.speed[-1] + a * step
+        else:
             a = V3D()
             v = V3D()
 
-        p = self.position[-1]+0.5*a*step**2 + self.speed[-1]*step
+        p = self.position[-1] + 0.5 * a * step**2 + self.speed[-1] * step
 
         self.acceleration.append(a)
         self.speed.append(v)
@@ -57,7 +61,11 @@ class Particule(object):
         return self.position[-1]
     
     def getSpeed(self):
-        return self.speed[-1]
+        if self.speed:
+            return self.speed[-1]
+        else:
+            return V3D(0, 0, 0)  # Valeur par défaut si vide
+
     
     def gameDraw(self,scale,screen):
         import pygame

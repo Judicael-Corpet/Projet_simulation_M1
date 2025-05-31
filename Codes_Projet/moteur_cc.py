@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from vector3D import Vector3D as V3D
 
 class MoteurCC:
     def __init__(self,
@@ -25,7 +26,7 @@ class MoteurCC:
         self.omega = 0.0
         self.i = 0.0
         self.torque = 0.0
-        self.position = 0.0
+        
 
         # Stockage pour tracé
         self.speed = []
@@ -42,7 +43,7 @@ class MoteurCC:
         # Équation mécanique enrichie
         domega = (self.torque - self.f * self.omega - self.couple_ext) / self.J
         self.omega += domega * step
-        self.position += self.omega * step
+        
 
         # Sauvegarde pour tracé
         if len(self.time) == 0:
@@ -52,10 +53,11 @@ class MoteurCC:
         self.speed.append(self.omega)
 
     def getSpeed(self):
-        return self.omega
+        return V3D( 0.0, 0.0, self.omega)
 
     def getPosition(self):
-        return self.position
+        return V3D(20, 20, 0)  # ou la position utilisée dans simulate_centrifugeuse()
+
 
     def getTorque(self):
         return self.torque

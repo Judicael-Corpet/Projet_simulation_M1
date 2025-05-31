@@ -1,6 +1,6 @@
 from pylab import figure, plot, show, legend
 from particule import *
-from univers import *
+from Codes_Projet.univers_avec_moteurCC import *
 
 
 monUnivers = Univers(game=True)

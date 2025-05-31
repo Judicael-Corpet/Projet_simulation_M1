@@ -1,7 +1,7 @@
 from vector3D import Vector3D as V
 from torseur import Torseur as T
 import matplotlib.pyplot as plt
-from univers import *
+from Codes_Projet.univers_avec_moteurCC import *
 from numpy import *
 
 import pygame
