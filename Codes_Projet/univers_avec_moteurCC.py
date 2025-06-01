@@ -5,12 +5,11 @@ lignes 345 à 349.
 La longueur du ressort cible peut également être réglée tout comme la vitesse 
 de rotation maximale.
 """
-from random import random,randint
 from vector3D import Vector3D as V3D
 from particule import Particule
 import pygame
 from pygame.locals import *
-from Moteur_CC import MoteurCC, ControlPI_vitesse
+from Moteur_CC import MoteurCC
 from types import MethodType
 import matplotlib.pyplot as plt
 

@@ -1,6 +1,7 @@
+import random
 from pylab import figure, plot, show, legend
 from particule import *
-from Codes_Projet.univers_avec_moteurCC import *
+from univers import *
 
 
 monUnivers = Univers(game=True)

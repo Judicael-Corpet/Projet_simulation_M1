@@ -1,14 +1,15 @@
 from vector3D import Vector3D as V
 from torseur import Torseur as T
 import matplotlib.pyplot as plt
+import numpy as np
 from numpy import *
 
 import pygame
 from pygame.locals import *
 from types import MethodType
 
-class Poutre:
-    def __init__(self, name = 'poutre', color = (0,0,0), masse = 1, longueur = 1, pos_init = V(), vit_init = V(), theta_0 = 0, omega_0 = 0):
+class Barre2D:
+    def __init__(self, name = 'barre', color = (0,0,0), masse = 1, longueur = 1, pos_init = V(), vit_init = V(), theta_0 = 0, omega_0 = 0, point_fixe=None, fixed_end='left'):
         self.name = name
         self.color = color
         self.masse = masse
@@ -18,9 +19,11 @@ class Poutre:
         self.vit = [vit_init]   # Vitesse du centre de masse (au milieu)
         self.orientation = [theta_0]   # Par rapport à l'axe x
         self.omega = [omega_0] # Vitesse de rotation
+        self.point_fixe = point_fixe  # Le point fixe pour le pendule
+        self.fixed_end = fixed_end  # 'left' ou 'right' pour déterminer l'extrémité fixée
 
     def __str__(self):
-        return f"Poutre(name = {self.name}, color = {self.color}, mass = {self.masse}, pos_init = {self.pos[0]}, vit_init = {self.vit[0]})"
+        return f"Barre(name = {self.name}, color = {self.color}, mass = {self.masse}, pos_init = {self.pos[0]}, vit_init = {self.vit[0]}, theta_0 = {self.orientation[0]}, Omega_0 = {self.omega[0]} , Point_fixe = {self.point_fixe})"
     
     def __repr__(self):
         return str(self)
@@ -30,50 +33,90 @@ class Poutre:
         for i in force:
             self.torseur.append(i)
 
+    def applyEffort (self, Force=V(), Torque= V(), Point = 0) :
+        if Point == -1 :
+            point_appli = V(self.pos[-1].x - self.longueur/2*np.cos(self.orientation[-1]))
+
+
     def move(self, dt):
         """Bouge d'un temps dt"""
+        g = 9.81  # Accélération due à la gravité
         sum_torseur = T()
-        for t in self.torseur:
-            P_temp = t.P
-            t.changePoint(self.pos[-1])
-            sum_torseur += t
-            t.changePoint(P_temp)
 
-        # Équilibre dynamique en translation du CDM
-        a_x = sum_torseur.R.x/self.masse
-        a_y = sum_torseur.R.y/self.masse
+        # Si la barre est fixée à un point fixe
+        if self.point_fixe is not None:
+            # Calcul de l'accélération angulaire pour un pendule
+            alpha = - (3 * g / (2 * self.longueur)) * np.sin(self.orientation[-1])
 
-        pos_init = self.pos[-1]
-        vit_init = self.vit[-1]
+            # Mise à jour de la vitesse angulaire (intégration)
+            omega_new = self.omega[-1] + alpha * dt
+            self.omega.append(omega_new)
 
-        new_vit_x = vit_init.x + a_x*dt
-        new_vit_y = vit_init.y + a_y*dt
+            # Mise à jour de l'orientation de la barre (intégration)
+            theta_new = self.orientation[-1] + omega_new * dt + 0.5 * alpha * dt**2
+            self.orientation.append(theta_new)
 
-        self.vit.append(V(new_vit_x, new_vit_y))
+            # Calcul de la position de l'extrémité libre en fonction de l'orientation
+            L = self.longueur  # Longueur de la barre
 
-        new_pos_x = pos_init.x + vit_init.x*dt + a_x*dt**2/2
-        new_pos_y = pos_init.y + vit_init.y*dt + a_y*dt**2/2
+            # Si l'extrémité gauche est fixée
+            if self.fixed_end == 'left':
+                # Position de l'extrémité libre (droite) calculée par rapport au point fixe
+                x_libre = self.point_fixe.x + L * 0.5 * np.sin(self.orientation[-1])
+                y_libre = self.point_fixe.y - L * 0.5 * np.cos(self.orientation[-1])
 
-        self.pos.append(V(new_pos_x, new_pos_y))
+            # Si l'extrémité droite est fixée
+            elif self.fixed_end == 'right':
+                # Position de l'extrémité libre (gauche) calculée par rapport au point fixe
+                x_libre = self.point_fixe.x - L * 0.5 * np.sin(self.orientation[-1])
+                y_libre = self.point_fixe.y + L * 0.5 * np.cos(self.orientation[-1])
 
-        # Équilibre en rotation
-        I = (1/12) * self.masse * self.longueur**2
+            # Ajoute la nouvelle position de l'extrémité libre
+            self.pos.append(V(x_libre, y_libre))
 
-        # Accélération angulaire
-        alpha = sum_torseur.M.z / I
-        # Vitesse angulaire (intégration)
-        omega_new = self.omega[-1] + alpha * dt
-        self.omega.append(omega_new)
-        # Position angulaier (intégration)
-        theta_new = self.orientation[-1] + omega_new * dt + 1/2 * alpha * dt**2
-        self.orientation.append(theta_new)
+        else:
+            # Si la barre n'est pas fixée, le mouvement suit les calculs de forces génériques
+            for t in self.torseur:
+                P_temp = t.P
+                t.changePoint(self.pos[-1])
+                sum_torseur += t
+                t.changePoint(P_temp)
+
+            # Équilibre dynamique en translation du centre de masse
+            a_x = sum_torseur.R.x / self.masse
+            a_y = sum_torseur.R.y / self.masse
+
+            pos_init = self.pos[-1]
+            vit_init = self.vit[-1]
+
+            new_vit_x = vit_init.x + a_x * dt
+            new_vit_y = vit_init.y + a_y * dt
+            self.vit.append(V(new_vit_x, new_vit_y))
+
+            new_pos_x = pos_init.x + vit_init.x * dt + a_x * dt**2 / 2
+            new_pos_y = pos_init.y + vit_init.y * dt + a_y * dt**2 / 2
+            self.pos.append(V(new_pos_x, new_pos_y))
+
+            # Calcul de l'inertie et de l'accélération angulaire pour la rotation
+            I = (1 / 12) * self.masse * self.longueur**2
+            alpha = sum_torseur.M.z / I
+
+            # Mise à jour de la vitesse angulaire (intégration)
+            omega_new = self.omega[-1] + alpha * dt
+            self.omega.append(omega_new)
+
+            # Mise à jour de l'orientation (intégration)
+            theta_new = self.orientation[-1] + omega_new * dt + 0.5 * alpha * dt**2
+            self.orientation.append(theta_new)
+
+
 
     def plot(self):
         pos = self.pos[-1]
         theta = self.orientation[-1]
         L = self.longueur / 2
 
-        # Coordonnées des extrémités de la poutre
+        # Coordonnées des extrémités de la barre
         dx = L * cos(theta)
         dy = L * sin(theta)
 
@@ -110,9 +153,9 @@ class Force:
         self.active = active
         self.color = color
     
-    def set_force(self, poutre):
+    def set_force(self, barre):
         if self.active:
-            poutre.ajout_effort(self.T)
+            barre.ajout_effort(self.T)
 
     def plot(self):
         if isinstance(self, Attractor):
@@ -144,12 +187,12 @@ class Gravity(Force):
         super().__init__(name, [], active, color)
         self.g = g
 
-    def set_force(self, poutre):
+    def set_force(self, barre):
         if self.active:
-            force = V(0, - self.g * poutre.masse, 0)
+            force = V(0, - self.g * barre.masse, 0)
 
-            T_g = T(poutre.pos[-1], force, V())
-            poutre.ajout_effort(T_g)
+            T_g = T(barre.pos[-1], force, V())
+            barre.ajout_effort(T_g)
 
             self.T_list.append(T_g)
 
@@ -159,14 +202,14 @@ class Damping(Force):
         self.c_trans = c_trans
         self.c_rot = c_rot
 
-    def set_force(self, poutre):
+    def set_force(self, barre):
         if self.active:
-            v = poutre.vit[-1]
+            v = barre.vit[-1]
             damping_force =  - self.c_trans * v
-            damping_moment = V(0, 0, - self.c_rot * poutre.omega[-1])
+            damping_moment = V(0, 0, - self.c_rot * barre.omega[-1])
 
-            T_c = T(poutre.pos[-1], damping_force, damping_moment)
-            poutre.ajout_effort(T_c)
+            T_c = T(barre.pos[-1], damping_force, damping_moment)
+            barre.ajout_effort(T_c)
 
             self.T_list.append(T_c)
 
@@ -178,22 +221,22 @@ class Attractor(Force):
         self.radius = radius
         self.intensity = intensity
 
-    def set_force(self, poutre):
-        if self.active and (poutre.pos[-1] - self.p0).mod() < self.radius:
-            vec = (self.p0 - poutre.pos[-1]).norm()
+    def set_force(self, barre):
+        if self.active and (barre.pos[-1] - self.p0).mod() < self.radius:
+            vec = (self.p0 - barre.pos[-1]).norm()
 
-            T_a = T(poutre.pos[-1], vec) * self.intensity
-            poutre.ajout_effort(T_a)
+            T_a = T(barre.pos[-1], vec) * self.intensity
+            barre.ajout_effort(T_a)
 
             self.T_list.append(T_a)
 
-class UniversPoutre:
+class UniversBarres:
     def __init__(self, name = "Versailles", t0 = 0, dt = 0.01, dimensions = (100, 100), game = False, gameFPS = 60, gameDimensions = (1024, 780)):
         self. name = name
         self.time = t0
         self.dt = dt
         
-        self.poutres_list = []
+        self.barres_list = []
         self.generators_list = []
 
         self.dimensions = dimensions
@@ -205,14 +248,14 @@ class UniversPoutre:
         self.scale = gameDimensions[0] / dimensions[0]
     
     def __str__(self):
-        return f"UniversPoutre(name = {self.name}, temps = {self.time}, dt = {self.dt})"
+        return f"UniversBarres(name = {self.name}, temps = {self.time}, dt = {self.dt})"
     
     def __repr__(self):
         return str(self)
     
-    def ajout_poutre(self, *poutres):
-        for p in poutres:
-            self.poutres_list.append(p)
+    def ajout_Barre(self, *barres):
+        for p in barres:
+            self.barres_list.append(p)
 
     def ajout_generators(self, *generators):
         for g in generators:
@@ -223,7 +266,7 @@ class UniversPoutre:
         for g in self.generators_list:
             g.T_list = []
 
-        for p in self.poutres_list:
+        for p in self.barres_list:
             for g in self.generators_list:
                 g.set_force(p)
             p.move(self.dt)
@@ -237,7 +280,7 @@ class UniversPoutre:
 
     def plot_all(self):
         cpt = 0
-        for p in self.poutres_list:
+        for p in self.barres_list:
             p.plot()
         for g in self.generators_list:
             g.plot()
@@ -246,7 +289,7 @@ class UniversPoutre:
         plt.legend()
 
     def draw_all(self, surface):
-        for p in self.poutres_list:
+        for p in self.barres_list:
             p.draw(surface, self.scale)
         for g in self.generators_list:
             g.draw(surface, self.scale)
@@ -277,22 +320,34 @@ class UniversPoutre:
 
 if __name__ == "__main__":
 
-    # Définition de la poutre
-   
+    # Définir un point fixe pour attacher l'extrémité de la barre
+    point_fixe = V(0, 0)  # Le point fixe à l'origine (0, 0)
 
-    P1 = Poutre("Poutre 1", (255, 0, 0), 1, 6, V(-8,15), V(10,0), pi/3)
-    print(P1)
+    # Définir une barre (pendule) avec une extrémité fixée
+    B1 = Barre2D(
+        name="Pendule",
+        longueur=20,  # Longueur de la barre (en unités arbitraires)
+        point_fixe=point_fixe,  # L'extrémité de la barre est attachée au point fixe
+        masse=2,  # Masse de la barre
+        theta_0=pi / 4,  # Position initiale de la barre (angle initial)
+        omega_0=0,  # Vitesse angulaire initiale
+        fixed_end='left'  # L'extrémité gauche est fixée
+    )
 
-    # Définition des générateurs (= forces)
-    G = Gravity()
-    D = Damping()
-    A = Attractor(p0 = V(), intensity = 20, radius = 100)
+    print(B1)  # Affiche la description de la barre
 
-    # Définition de l'Univers
-    U = UniversPoutre(game = True)
-    U.ajout_poutre(P1)
-    U.ajout_generators(G, D, A)   
+    # Définir les forces appliquées à la barre
+    G = Gravity()  # Force de gravité
+    D = Damping()  # Force d'amortissement
+
+    # Définir l'Univers de simulation
+    U = UniversBarres(game=True)  # Initialise l'univers de simulation avec Pygame
+    U.ajout_Barre(B1)  # Ajoute la barre à l'univers
+    U.ajout_generators(G)  # Ajoute les générateurs de forces (gravité et amortissement)
+
+    # Simuler en temps réel pendant 15 secondes
     U.simulatedRealTime(duration=15)
+
     
     
 

@@ -41,6 +41,13 @@ class Torseur():
         other.changePoint(Po)
         return(test)
 
+    def __mul__(self, scalar):
+        if isinstance(scalar, (int, float)):  # Vérifie si le scalaire est un nombre
+            new_R = self.R * scalar  # Multiplie les composantes de l'effort (vecteur R)
+            new_M = self.M * scalar  # Multiplie les composantes du moment (vecteur m)
+            return Torseur(self.P, new_R, new_M)  # Crée un nouveau torseur avec le scalaire appliqué
+        else:
+            raise TypeError("Multiplication uniquement avec un scalaire (int ou float)")
 
 
 if __name__ == "__main__": # false lors d'un import

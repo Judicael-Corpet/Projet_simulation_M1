@@ -2,19 +2,18 @@ from vector3D import Vector3D as V3D
 from math import pi,atan2
 
 class Particule(object):
-
     def __init__(self, mass=1, p0=V3D(), v0=V3D(), a0=V3D(), fix=False, name="paf", color='red'):
         self.mass = mass
-        self.position = [p0]
-        self.speed = [v0]
-        self.acceleration = [a0]
+        self.position = p0  # Assurez-vous que position est un seul V3D, pas une liste
+        self.speed = v0
+        self.acceleration = a0
         self.name = name
         self.color = color
         self.forces = V3D()
         self.fix = fix
 
     def __str__(self):
-        msg = 'Particule ('+str(self.mass)+', '+str(self.position[-1])+', '+str(self.speed[-1])+', '+str(self.acceleration[-1])+', "'+self.name+'", "'+str(self.color)+'" )'
+        msg = 'Particule ('+str(self.mass)+', '+str(self.position)+', '+str(self.speed)+', '+str(self.acceleration)+', "'+self.name+'", "'+str(self.color)+'" )'
         return msg
 
     def __repr__(self):
@@ -24,66 +23,51 @@ class Particule(object):
         for f in args:
             self.forces += f
 
-    def simulate(self,step):
+    def simulate(self, step):
         self.pfd(step)
         
     def pfd(self, step):
         if not self.speed:
-            self.speed = [V3D(0, 0, 0)]
+            self.speed = V3D(0, 0, 0)
         if not self.acceleration:
-            self.acceleration = [V3D(0, 0, 0)]
+            self.acceleration = V3D(0, 0, 0)
 
         if not(self.fix):
             a = self.forces * (1 / self.mass)
-            v = self.speed[-1] + a * step
+            v = self.speed + a * step
         else:
             a = V3D()
             v = V3D()
 
-        p = self.position[-1] + 0.5 * a * step**2 + self.speed[-1] * step
+        p = self.position + 0.5 * a * step**2 + self.speed * step
 
-        self.acceleration.append(a)
-        self.speed.append(v)
-        self.position.append(p)
+        self.acceleration = a
+        self.speed = v
+        self.position = p
         self.forces = V3D()
 
-    def plot(self):
-        from pylab import plot
-        X=[]
-        Y=[]
-        for p in self.position:
-            X.append(p.x)
-            Y.append(p.y)
-    
-        return plot(X,Y,color=self.color,label=self.name)+plot(X[-1],Y[-1],'o',color=self.color)    
-
+    # Correction de la méthode `getPosition` pour retourner simplement `self.position`
     def getPosition(self):
-        return self.position[-1]
+        return self.position  # Retourne directement l'objet Vector3D (pas d'indexation)
     
     def getSpeed(self):
-        if self.speed:
-            return self.speed[-1]
-        else:
-            return V3D(0, 0, 0)  # Valeur par défaut si vide
+        return self.speed if self.speed else V3D(0, 0, 0)  # Retourne la vitesse ou une valeur par défaut
 
-    
-    def gameDraw(self,scale,screen):
+    def gameDraw(self, scale, screen):
         import pygame
-        
-        X = int(scale*self.getPosition().x)
-        Y = int(scale*self.getPosition().y)
-        
-        VX = int(scale*self.getSpeed().x)
-        VY = int(scale*self.getSpeed().y) 
-        size=3
+        X = int(scale * self.position.x)
+        Y = int(scale * self.position.y)
+        VX = int(scale * self.speed.x)
+        VY = int(scale * self.speed.y)
+        size = 3
         
         if type(self.color) is tuple:
-            color = (self.color[0]*255,self.color[1]*255,self.color[2]*255)
+            color = (self.color[0] * 255, self.color[1] * 255, self.color[2] * 255)
         else:
-            color=self.color
-            
-        pygame.draw.circle(screen,color,(X,Y),size*2,size)
-        pygame.draw.line(screen,color,(X,Y),(X+VX,(Y+VY)),size)
+            color = self.color
+
+        pygame.draw.circle(screen, color, (X, Y), size * 2, size)
+        pygame.draw.line(screen, color, (X, Y), (X + VX, (Y + VY)), size)
 
 if __name__=='__main__':
     from pylab import figure, show, legend
@@ -95,9 +79,6 @@ if __name__=='__main__':
         P0.applyForce(V3D(0, -9.81, 0))
         P0.pfd(0.01)
         
-    figure()
-    P0.plot()
-    legend()
-    show()
+    
     
     
